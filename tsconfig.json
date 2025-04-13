@@ -10,5 +10,17 @@
     {
       "path": "./tsconfig.vitest.json"
     }
-  ]
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "esnext",
+    "lib": ["DOM", "ESNext"],
+    "types": ["vite/client"],
+    "allowSyntheticDefaultImports": true
+  }
 }
