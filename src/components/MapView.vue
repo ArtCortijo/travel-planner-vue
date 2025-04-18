@@ -1,26 +1,24 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import mapboxgl from 'mapbox-gl'
+import { useTripsStore } from '@/stores/trips'
 import '../../node_modules/mapbox-gl/dist/mapbox-gl.css'
 
 const mapContainer = ref<HTMLElement | null>(null)
-// TypeScript issue when working with deeply inferred types from external libraries like Mapbox GL
-// can be fixed by using the `Ref` type
-const markers: Ref<mapboxgl.Marker[]> = ref([])
-// or by using a more relaxed type
-// const markers = ref([] as unknown as mapboxgl.Marker[])
-let map: mapboxgl.Map | null = null
+const map = ref<mapboxgl.Map | null>(null) as Ref<mapboxgl.Map | null>
+const marker: Ref<mapboxgl.Marker | null> = ref(null)
+const tripsStore = useTripsStore()
+
+// Use the environment variable directly
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string
 
 onMounted(() => {
   if (mapContainer.value) {
-    // Use the environment variable directly
-    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string
-
     // Montreal coordinates: longitude, latitude
     const montrealCoordinates: [number, number] = [-73.5674, 45.5017]
 
-    map = new mapboxgl.Map({
+    map.value = new mapboxgl.Map({
       container: mapContainer.value,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: montrealCoordinates,
@@ -28,21 +26,45 @@ onMounted(() => {
     })
 
     // Adding controls
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right')
+    map.value.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
-    map.on('load', () => {
+    map.value.on('load', () => {
       // additional map configuration here
-    })
-
-    // Adding a marker when click on the map
-    map.on('click', (e) => {
-      const { lng, lat } = e.lngLat
-      const marker = new mapboxgl.Marker().setLngLat([lng, lat]).addTo(map!)
-      markers.value.push(marker)
-      console.log('lng: ', lng, ' lat: ', lat)
     })
   }
 })
+
+// Function to focus on a location
+const focusLocation = (coords: [number, number]) => {
+  if (map.value) {
+    // Move map to new location
+    map.value.flyTo({ center: coords, zoom: 12 })
+
+    // Remove existing marker if present
+    if (marker.value) {
+      marker.value.remove()
+    }
+
+    // Add new marker
+    marker.value = new mapboxgl.Marker().setLngLat(coords).addTo(map.value)
+  }
+}
+
+// Expose the method to parent components
+defineExpose({ focusLocation })
+
+// Watch for changes in selected location when a trip is added
+watch(
+  () => tripsStore.trips[tripsStore.trips.length - 1], // watch the last trip
+  (newTrip) => {
+    if (newTrip && map.value) {
+      const coords = newTrip.coordinates
+      focusLocation(coords)
+    }
+  },
+  // Vue will recursively watch everything inside the object
+  { deep: true },
+)
 </script>
 
 <template>
